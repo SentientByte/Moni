@@ -1,74 +1,52 @@
-import pandas as pd
-import fitz  # PyMuPDF
 from transformers import pipeline
 import torch
+import re
 
-# Setup LLaMA (or compatible) text classification model
+# Define target categories
 candidate_labels = [
-    "groceries", "utilities", "entertainment", "transport", "dining", "salary", "others"
+    "groceries", "utilities", "entertainment", "transport", "dining",
+    "salary", "shopping", "payments", "automotive", "health", "government", "others"
 ]
 
+# Use GPU if available
 device = 0 if torch.cuda.is_available() else -1
-classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device=device)
+classifier = pipeline(
+    "zero-shot-classification",
+    model="facebook/bart-large-mnli",
+    device=device
+)
 
-def parse_pdf_to_df(file):
-    text = ""
-    with fitz.open(stream=file.read(), filetype="pdf") as doc:
-        for page in doc:
-            text += page.get_text()
+# Keyword-based category map
+CATEGORY_KEYWORDS = {
+    "payments": ["payment received thank you"],
+    "groceries": ["supermarket", "market", "mini mart", "aswaq", "lulu", "tawfeer", "ewa"],
+    "transport": ["petrol", "station"],
+    "dining": ["cafe", "bakery", "ceasers", "bateel", "restaurant"],
+    "automotive": ["spare parts", "auto"],
+    "shopping": ["fashion", "perfumes", "electronics", "sports", "house trading", "shoe", "r and b", "max"],
+    "government": ["moi", "batelco"],
+    "health": ["pharmacy"],
+    "utilities": ["ewa", "batelco","MOI",'eGov'],
+    "others": []
+}
 
-    lines = [line.strip() for line in text.split("\n")]
-    transactions = []
-    i = 0
+def keyword_category(description):
+    """Check description against known keywords."""
+    desc_lower = description.lower()
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        for kw in keywords:
+            if kw in desc_lower:
+                return category
+    return None
 
-    print("--- DEBUG: Total lines extracted:", len(lines))
-
-    while i < len(lines) - 4:
-        try:
-            posting_date = lines[i].strip()
-            transaction_date = lines[i + 1].strip()
-            description = lines[i + 2].strip()
-            maybe_blank = lines[i + 3].strip()
-            amount_line = lines[i + 4].strip()
-
-            # Look for lines like "10.000 CR" or "12.500 DR"
-            if not ("CR" in amount_line or "DR" in amount_line):
-                i += 1
-                continue
-
-            parts = amount_line.split()
-            if len(parts) < 2:
-                i += 1
-                continue
-
-            amount_str = parts[0].replace(",", "")
-            direction = parts[1].upper()
-            amount = float(amount_str)
-            if direction == "DR":
-                amount = -amount
-
-            # Use LLaMA (or equivalent model) to classify category
-            cat_result = classifier(description, candidate_labels)
-            category = cat_result["labels"][0] if cat_result and "labels" in cat_result else "others"
-
-            transactions.append({
-                "date": posting_date,
-                "description": description,
-                "amount": amount,
-                "category": category
-            })
-            i += 5
-        except Exception as e:
-            print(f"Skipping block at line {i} due to error: {e}")
-            i += 1
-
-    print("Matched transactions:", len(transactions))
-
-    df = pd.DataFrame(transactions)
-    if df.empty:
-        print("⚠️ No transactions parsed from PDF.")
-
-    df["date"] = pd.to_datetime(df["date"], format="%d/%m/%y", errors="coerce")
-    df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
-    df.dropna(subset=["date", "description", "amount"], inplace=True)
-    return df.reset_index(drop=True)
+def categorize(df):
+    """Assign category to each transaction using keyword match or LLaMA fallback."""
+    categories = []
+    for desc in df["description"]:
+        cat = keyword_category(desc)
+        if not cat:
+            result = classifier(desc, candidate_labels)
+            cat = result["labels"][0] if result and "labels" in result else "others"
+        categories.append(cat)
+    df["category_ai"] = categories
+    return df
