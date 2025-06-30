@@ -26,7 +26,7 @@ CATEGORY_KEYWORDS = {
     "shopping": ["fashion", "perfumes", "electronics", "sports", "house trading", "shoe", "r and b", "max"],
     "government": ["moi", "batelco"],
     "health": ["pharmacy"],
-    "utilities": ["ewa", "batelco","MOI",'eGov'],
+    "utilities": ["ewa", "EWA", "batelco","MOI",'eGov'],
     "others": []
 }
 
