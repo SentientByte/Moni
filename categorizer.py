@@ -1,6 +1,6 @@
+# Updated categorizer.py
 from transformers import pipeline
 import torch
-import re
 
 # Define target categories
 candidate_labels = [
@@ -26,7 +26,7 @@ CATEGORY_KEYWORDS = {
     "shopping": ["fashion", "perfumes", "electronics", "sports", "house trading", "shoe", "r and b", "max"],
     "government": ["moi", "batelco"],
     "health": ["pharmacy"],
-    "utilities": ["ewa", "EWA", "batelco","MOI",'eGov'],
+    "utilities": ["ewa", "batelco", "moi", "egov"],
     "others": []
 }
 
@@ -40,13 +40,13 @@ def keyword_category(description):
     return None
 
 def categorize(df):
-    """Assign category to each transaction using keyword match or LLaMA fallback."""
+    """Assign category to each transaction using keyword match or zero-shot fallback."""
     categories = []
     for desc in df["description"]:
         cat = keyword_category(desc)
         if not cat:
             result = classifier(desc, candidate_labels)
             cat = result["labels"][0] if result and "labels" in result else "others"
-        categories.append(cat)
+        categories.append(cat.capitalize())
     df["category_ai"] = categories
     return df
