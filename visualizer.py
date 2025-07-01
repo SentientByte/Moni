@@ -4,19 +4,21 @@ import pandas as pd
 def summary_stats(df):
     spent = df[df.amount < 0].amount.sum()
     income = df[df.amount > 0].amount.sum()
-    return spent, income
+    num_days = (df["date"].max() - df["date"].min()).days + 1
+    avg_daily = spent / num_days if num_days > 0 else 0
+    return spent, income, avg_daily
 
 def plot_category_bar(df):
     df_filtered = df[df["amount"] < 0]
-    cat_totals = df_filtered.groupby("category_ai")["amount"].sum().abs().reset_index()
+    cat_totals = df_filtered.groupby("Category")["amount"].sum().abs().reset_index()
     fig = px.bar(
         cat_totals,
         x="amount",
-        y="category_ai",
+        y="Category",
         orientation="h",
-        color="category_ai",
+        color="Category",
         title="Spending by Category",
-        labels={"amount": "Total Spent", "category_ai": "Category"},
+        labels={"amount": "Total Spent", "Category": "Category"},
         height=400
     )
     fig.update_layout(showlegend=False, margin=dict(t=40, b=30, l=30, r=30))
@@ -36,10 +38,10 @@ def plot_daily_bar(df):
     return fig
 
 def plot_pie(df):
-    pie_data = df[df.amount < 0].groupby("category_ai")["amount"].sum().abs().reset_index()
+    pie_data = df[df.amount < 0].groupby("Category")["amount"].sum().abs().reset_index()
     fig = px.pie(
         pie_data,
-        names="category_ai",
+        names="Category",
         values="amount",
         title="Spending Distribution by Category",
         height=400
